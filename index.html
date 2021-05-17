@@ -1,0 +1,298 @@
+$def with (board, boards, post, posts, comments, board_form, post_form, comment_form, mobile, admin, statics)
+$code:
+	def format_body(text):
+		"""
+		takes: post['content']
+		returns: formatted post['content']
+
+		formats post bodies according to regex patterns specified by admin
+		not safe for user comments
+		"""
+		if board['tags']:
+			for pair in board['tags'].split("\n"):
+				if "#split#" in pair:
+					pattern, newtext = pair.split("#split#", 1)
+					text = re.sub(pattern, newtext, text)
+
+		return text
+
+	def format_safe(text):
+		"""
+		user-safe post formatting
+		simple paragraph styling and alignment
+		"""
+		text = websafe(text)
+		final = text.replace("\n", "</p> <p id='bodytext'>")
+		return final
+
+	def format_form(form):
+		"""
+		web.py forms default table organization doesn't lend itself well to styling
+		removes table information and replaces it with row and column divs
+		"""
+
+		form = form.replace("<table>","")
+		form = form.replace("</table>","")
+		form = form.replace("<tr><th><label", "<div class='row'><div class='col-25'><label")
+		form = form.replace("</th><td>", "</div><div class='col-75'>")
+		form = form.replace("</td></tr>", "</div></div>")
+
+		form = form.replace('<label for="comment">comment</label>', "")
+
+		form = "<div class='container'>%s</div>" % (form)
+
+		return form
+
+
+	""" a simple fix for a complex problem
+	if the board specified is the index board with no extension
+	then the board['link'] is /
+	otherwise the board['link'] is /board
+
+	the first works with formatting such as $board['link']view/1
+	the second works with formatting $board['link']/view/1
+
+	thus the simplest solution is to remove the / from board['link'] and use the second format
+
+	if board['link'] == '/':
+		boardlink = ''
+	else:
+		boardlink = board['link']
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title> Monchy Tales </title>
+	$if post:
+			<meta name="keywords" content="$post['keywords'] $board['keywords']"/>
+	<meta name="description" content="this describes the page" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+	$#twitter card meta tags for posting on twitter
+	$#much more effective and eye catching than a simple link
+
+	$if post:
+		<meta name="twitter:card" content="summary" />
+		<meta name="twitter:site" content="@monchytales" /> $# update login form to allow user info
+		<meta name="twitter:creator" content="@monchytales" /> $# unclear if this is be the admin username or the twitter username
+		<meta property="og:url" content="$boardlink/view/$post['id'] " />
+		<meta property="og:title" content="$post['title']" />
+		<meta property="og:description" content="$post['titletext']" />
+		<meta property="og:image" content="$board['sitelogo']" />
+
+	<meta charset="UTF-8" />
+	<link rel="shortcut icon" type="image/png" href="/static/img/favicon.png" />
+
+	<style>
+		$# in-line css has the advantage of being loaded directly with the page
+		$# during development no special measures need to be taken when refreshing the page
+		$# this method also allows the user to make a site mobile-friendly using only CSS
+		$# and a single javascript function
+		$if mobile:
+			$board['mobile']
+		$else:
+			$board['css']
+	</style>
+
+</head>
+<body>
+	<div id="all" >
+
+		<div id="top" >
+			$# board logo and site logo should be made optional here so that 
+			$# someone could chose not to add them if they want
+			<img id="logo1" src="$board['sitelogo']">
+			<div id="posttitle" ><h1> $board['name'] </h1></div>
+			<img id="logo2" src="$board['boardlogo']">
+		</div>
+
+		<div id="linkbar" >
+			<center>
+				<div id="subtitle">
+					$for cur in boards:
+						<a href="$cur['link']" class="boardlink"> $cur['name'] </a>
+					$if admin:
+						$# admin links for adding new posts, new boards, or editing existing boards
+						<a href="$(boardlink)/new" class="boardlink"> New Post</a>
+						<a href="/newboard" class="boardlink"> New Board</a>
+						<a href="/editboard/$board['title']" class="boardlink"> Edit $board['title'] </a>
+				</div>
+				$if mobile and len(posts) > 0 and board['post_order']:
+					$# adds a button that hides and shows the board posts on mobile if the list is available
+					<button id="postButton" onclick="showPosts()">Posts</button>
+			</center>
+		</div>
+
+		<div id="center" >
+			<div id="menu1">
+				&nbsp; 
+				$# menu1 optionally shows a list of all posts in a board-specified order
+				$# if the user is admin then the option to edit each post is added
+				$if posts != [] and board['post_order']:
+					<ul>
+					$for cur_post in posts:
+						<li>
+							<p><a href="$(boardlink)/view/$cur_post['id']">$cur_post['title']</a></p>
+							<p>
+								$if admin:
+									<a href="$(boardlink)/edit/$cur_post['id']">Edit</a>
+							</p>
+						</li>
+					</ul>
+			</div>
+
+			<div id="mainbody">
+				$#new/edit page
+				<center>
+				$# initially considered using only a single post form block for
+				$# both new/edit post and new/edit board
+				$# this proved to be more convoluted and less maintainable than is desired
+
+				$if admin and post_form:
+					$# lays out the post form from forms.py 
+					$# blank if /new, filled out if /edit
+					$# method is post, get submissions are insecure and should never be used
+					<div class="controls">
+						<form action="" method="post">
+							$:post_form.render()
+						</form>
+						<form method="POST" enctype="multipart/form-data" action="/upload">
+								<input type="text" name="directory" size="20">
+								<input type="file" name="myfile" />
+							<br/>
+							<input type="submit" />
+						</form>
+					</div>
+
+				$if admin and board_form:
+					$# lays out the board form from forms.py
+					$# blank if /newboard, filled out if /editboard
+					$# includes the option to delete board, must add "are you sure" prompt
+					<div class="controls">
+						<form action="/delboard/$board['title']" method="post">
+							<input type="submit" value="Delete Board"/>
+						</form>
+						<form action="" method="post">
+							$:board_form.render()
+						</form>
+					</div>
+
+				$#adds a link to allow admin (and only admin) to edit the current post
+				$if post and admin:
+					<div class="controls">
+						<div class="col">
+							<a href="$(boardlink)/edit/$post['id']">Edit</a>
+						</div>
+					</div>
+				$#view
+				</center>
+				$if post:
+					$# formats the post onto the page in the specified manner
+					$# does this on both /view and /edit pages providing a preview of the post
+					$# after the form so that the admin can read through and consider how a post should be changed
+
+					<div id="wholepost">
+						<center><h2>$post['title']</h2></center>
+						<p class="byline"><center><h5> $post['titletext'] </h5></center><center>Posted: $datestr(post['posted_on'])</center></p>
+						<div>
+							$:format_body(post['content'])
+						</div>
+					</div>
+
+				<div class="fill_h"><hr></div>
+
+				<center>
+					<h3>Comments</h3>
+					$for comment in comments:
+						$# formats all comments of the post safely
+						$# adds option to delete posts for the admin
+						$# style tags
+
+						<div class="comment">
+							<p class="byline"><div class="name">$comment['title']</div> Posted: $datestr(comment['posted_on'])</p>
+							$if admin:
+								<form action="$(boardlink)/delete/$comment['id']" method="post">
+									<input type="submit" value="Delete post"/>
+								</form>
+							<div>
+								<p id="bodytext"> $:format_safe(comment['content']) </p>
+							</div>
+						</div>
+						<hr>
+				</center>
+
+				<div class="fill_h"><hr></div>
+				$# a simple form to allow user comments, found on forms.py
+				$# all inputs are tokeniezed by the web.py framework
+				$# making SQL injections functionally impossible
+
+				$if comment_form:
+
+					<center>
+						<div class="fill_h" id="commentpost">
+							<form action="" method="post">
+								$:format_form(comment_form.render())
+							</form>
+						</div>
+					</center>
+			</div>
+
+			<div id="menu2">
+			&nbsp; 
+				$# menu2 contains information useful to the admin which may not be available to the users
+				$# so far it contains a list of all board posts and a list of all images in /static/img
+				$# future plans should include user statistics such as visitor numbers
+				$if admin:
+					$if posts != []:
+						<ul>
+						$for cur_post in posts:
+							<li>
+								<p><a href="$(boardlink)/view/$cur_post['id']">$cur_post['title']</a></p>
+								<p>
+									$if admin:
+										<a href="$(boardlink)/edit/$cur_post['id']">Edit</a>
+								</p>
+							</li>
+						</ul>
+					<hr>
+					$for img in statics['img']:
+						$img
+						<br>
+					$if post:
+						$# delete post was moved down here because testing showed it was too easy to
+						$# hit when it was part of the post form, need to add "are you sure" prompt
+						<div class="col">
+							<form action="$(boardlink)/delete/$post['id']" method="post">
+								<input type="submit" value="Delete post"/>
+							</form>
+						</div>
+
+			</div>
+		</div>
+		<div id="fade_bar" class="fill_h"> &nbsp; </div>
+		<div id="footer" class="fill_h">
+			<center>
+				$# footer for about information and links
+				<div class="footerstub"> $:board['footer']</div>
+			</center>
+		</div>
+	</div>
+	$# this is the showposts script function for mobile
+	$# simply changes the display style of menu1 from none to block and back
+	$# potentially should make this part of the board or post form to allow user scripts
+	$# to shape the webpage more easily
+	<script>
+		function showPosts(){
+			var x = document.getElementById("menu1");
+			if (x.style.display === "block"){
+				x.style.display="none";
+			} else {
+				x.style.display="block";
+			}
+		}
+	</script>
+</body>
+
+
+
+
+

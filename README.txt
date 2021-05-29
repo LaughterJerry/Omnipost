@@ -1,6 +1,6 @@
 The Omnipost simple blog system
 
-(c) Monchy, 2021
+(c) Jerry Laughter, 2021
 
 GPL v3
 

@@ -61,7 +61,7 @@ $code:
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<title> Monchy Tales </title>
+	<title> Sitename </title>
 	$if post:
 			<meta name="keywords" content="$post['keywords'] $board['keywords']"/>
 	<meta name="description" content="this describes the page" />
@@ -72,8 +72,8 @@ $code:
 
 	$if post:
 		<meta name="twitter:card" content="summary" />
-		<meta name="twitter:site" content="@monchytales" /> $# update login form to allow user info
-		<meta name="twitter:creator" content="@monchytales" /> $# unclear if this is be the admin username or the twitter username
+		<meta name="twitter:site" content="@siteowner" /> $# update login form to allow user info
+		<meta name="twitter:creator" content="@siteowner" /> $# unclear if this is be the admin username or the twitter username
 		<meta property="og:url" content="$boardlink/view/$post['id'] " />
 		<meta property="og:title" content="$post['title']" />
 		<meta property="og:description" content="$post['titletext']" />
